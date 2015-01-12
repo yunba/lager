@@ -29,6 +29,7 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-include("eunit.hrl").
 -export([pop/0, count/0, count_ignored/0, flush/0, print_state/0]).
 -endif.
 
@@ -1198,6 +1199,53 @@ async_threshold_test_() ->
                         %% async is true again now that the mailbox has drained
                         ?assertEqual(true, lager_config:get(async)),
                         ok
+                end
+            }
+        ]
+    }.
+
+discard_threshold_test_() ->
+    {foreach,
+        fun() ->
+            error_logger:tty(false),
+            application:load(lager),
+            application:set_env(lager, error_logger_redirect, false),
+            application:set_env(lager, async_threshold, 2),
+            application:set_env(lager, async_threshold_window, 1),
+            application:set_env(lager, discard_threshold, 10),
+            application:set_env(lager, handlers, [{?MODULE, info}]),
+            lager:start()
+        end,
+        fun(_) ->
+            application:unset_env(lager, async_threshold),
+            application:unset_env(lager, discard_threshold),
+            application:stop(lager),
+            application:stop(goldrush),
+            error_logger:tty(true)
+        end,
+        [
+            {"discard threshold works",
+                fun() ->
+                    %% we start out no discard
+                    ?assertEqual(false, lager_config:get(discard)),
+
+                    ?assertEqual(0, count()),
+                    %% put a ton of things in the queue
+                    Workers = [spawn_monitor(fun() -> [lager:info("hello world") || _ <- lists:seq(1, 1000)] end) || _ <- lists:seq(1, 20)],
+
+                    %% wait for all the workers to return, meaning that all the messages have been logged (since we're in sync mode)
+                    collect_workers(Workers),
+                    %% serialize ont  the mailbox again
+                    _ = gen_event:which_handlers(lager_event),
+                    %% just in case...
+                    timer:sleep(1000),
+                    lager:info("hello world"),
+                    _ = gen_event:which_handlers(lager_event),
+
+                    ?assertLess(count(), 20001),
+                    %% discard is false again now that the mailbox has drained
+                    ?assertEqual(false, lager_config:get(discard)),
+                    ok
                 end
             }
         ]

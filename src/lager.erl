@@ -112,11 +112,13 @@ do_log(Severity, Metadata, Format, Args, Size, SeverityAsInt, LevelThreshold, Tr
             end,
             LagerMsg = lager_msg:new(Msg,
                 Severity, Metadata, Destinations),
-            case lager_config:get(async, false) of
-                true ->
+            case {lager_config:get(async, false), lager_config:get(discard, false)} of
+                {true, _} ->
                     gen_event:notify(Pid, {log, LagerMsg});
-                false ->
-                    gen_event:sync_notify(Pid, {log, LagerMsg})
+                {false, false} ->
+                    gen_event:sync_notify(Pid, {log, LagerMsg});
+                {false, true} ->
+                    ignore   %% discard the incoming log
             end;
         false ->
             ok

@@ -32,12 +32,15 @@
 -record(state, {
         hwm :: non_neg_integer(),
         window_min :: non_neg_integer(),
-        async = true :: boolean()
+        async = true :: boolean(),
+        discard_min :: non_neg_integer(),
+        discard = false :: boolean()
     }).
 
-init([Hwm, Window]) ->
+init([Hwm, Window, Discard]) ->
     lager_config:set(async, true),
-    {ok, #state{hwm=Hwm, window_min=Hwm - Window}}.
+    lager_config:set(discard, false),
+    {ok, #state{hwm=Hwm, window_min=Hwm - Window, discard_min = Discard}}.
 
 
 handle_call(get_loglevel, State) ->
@@ -49,19 +52,30 @@ handle_call(_Request, State) ->
 
 handle_event({log, _Message},State) ->
     {message_queue_len, Len} = erlang:process_info(self(), message_queue_len),
-    case {Len > State#state.hwm, Len < State#state.window_min, State#state.async} of
+    State2 = case {Len > State#state.discard_min, State#state.discard} of
+                 {true, false} ->
+                     lager_config:set(discard, true),
+                     State#state{discard = true};
+                 {false, true} ->
+                     lager_config:set(discard, false),
+                     State#state{discard = false};
+                 _ ->
+                     State
+    end,
+    case {Len > State2#state.hwm, Len < State2#state.window_min, State2#state.async} of
         {true, _, true} ->
             %% need to flip to sync mode
             lager_config:set(async, false),
-            {ok, State#state{async=false}};
+            {ok, State2#state{async=false}};
         {_, true, false} ->
             %% need to flip to async mode
             lager_config:set(async, true),
-            {ok, State#state{async=true}};
+            {ok, State2#state{async=true}};
         _ ->
             %% nothing needs to change
-            {ok, State}
+            {ok, State2}
     end;
+
 handle_event(_Event, State) ->
     {ok, State}.
 

@@ -54,8 +54,15 @@ start(_StartType, _StartArgs) ->
                           "Invalid value for 'async_threshold_window': ~p~n", [BadWindow]),
                         throw({error, bad_config})
                 end,
+
+            DiscardThreshold = case application:get_env(lager, discard_threshold) of
+                                   {ok, DefThreshold} when is_integer(DefThreshold), DefThreshold > Threshold ->
+                                       DefThreshold;
+                                   _ ->
+                                       undefined
+                               end,
             _ = supervisor:start_child(lager_handler_watcher_sup,
-                                       [lager_event, lager_backend_throttle, [Threshold, ThresholdWindow]]),
+                                       [lager_event, lager_backend_throttle, [Threshold, ThresholdWindow, DiscardThreshold]]),
             ok;
         {ok, BadThreshold} ->
             error_logger:error_msg("Invalid value for 'async_threshold': ~p~n", [BadThreshold]),

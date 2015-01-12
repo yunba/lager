@@ -145,6 +145,8 @@ specified via the crash_log_msg_size application variable.
 Overload Protection
 -------------------
 
+### Asynchronous Threshold
+
 Prior to lager 2.0, the gen_event at the core of lager operated purely in
 synchronous mode. Asynchronous mode is faster, but has no protection against
 message queue overload. In lager 2.0, the gen_event takes a hybrid approach. it
@@ -164,6 +166,23 @@ If you wish to disable this behaviour, simply set it to 'undefined'. It defaults
 to a low number to prevent the mailbox growing rapidly beyond the limit and causing
 problems. In general, lager should process messages as fast as they come in, so getting
 20 behind should be relatively exceptional anyway.
+
+### Discard Threshold
+
+In synchronous mode, the calling process will be blocked if log messages are flooding. 
+To prevent it, you can set a discard threshold
+
+```erlang
+{discard_threshold, 100}  %% (> async_threshold)
+```
+
+This will discard the incoming messages simply after the mailbox exceeding 100 messages,
+and switch back to normal synchronous mode, when size reduces to `100`.
+
+If you wish to disable the behaviour, just skip it or set it to 'undefined'. It won't 
+prevent the mailbox growing rapidly and causing the calling process to be blocked.
+
+### Error Logger Rate Limit
 
 If you want to limit the number of messages per second allowed from error_logger,
 which is a good idea if you want to weather a flood of messages when lots of
