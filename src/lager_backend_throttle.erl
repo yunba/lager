@@ -52,11 +52,13 @@ handle_call(_Request, State) ->
 
 handle_event({log, _Message},State) ->
     {message_queue_len, Len} = erlang:process_info(self(), message_queue_len),
-    State2 = case {Len > State#state.discard_min, State#state.discard} of
+    State2 = case {Len >= State#state.discard_min, State#state.discard} of
                  {true, false} ->
+                     ?INT_LOG(warning, "Mailbox size ~p exceeded the limit of ~p, Starting to drop messages", [Len, State#state.discard_min]),
                      lager_config:set(discard, true),
                      State#state{discard = true};
                  {false, true} ->
+                     ?INT_LOG(warning, "Mailbox size ~p went below the limit of ~p, Starting to log messages", [Len, State#state.discard_min]),
                      lager_config:set(discard, false),
                      State#state{discard = false};
                  _ ->
