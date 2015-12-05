@@ -421,3 +421,12 @@ You can also pass it to erlc, if you prefer:
 ```
 erlc -pa lager/ebin +'{parse_transform, lager_transform}' +'{lager_truncation_size, 1024}' file.erl
 ```
+
+Delete Lager Handler at Runtime
+--------
+
+Refer to this [link](http://erlang.org/pipermail/erlang-questions/2012-February/064255.html)
+
+```
+>  gen_event:delete_handler(lager_event, {lager_file_backend,"log/emqtt_error.log"}, [{file, "log/emqtt_error.log"},{level, error},{size, 1048576000},{date, "$D0"},{count, 5}]).
+```
